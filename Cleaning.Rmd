@@ -9,6 +9,7 @@ GAMES_DETAILS = read.csv("Data/games_details.csv")
 TEAMS = read.csv("Data/teams.csv")
 PLAYERS = read.csv("Data/players.csv")
 ```
+### CLEANING THE DATA
 ```{r}
 #Clean the date variable in games
 GAMES = GAMES %>%
@@ -195,3 +196,4 @@ GAMES$WEIGHT_PROP_diff = GAMES$WEIGHT_PROP_home - GAMES$WEIGHT_PROP_away
 GAMES$AVG_HEIGHT_diff = GAMES$AVG_HEIGHT_home - GAMES$AVG_HEIGHT_away
 GAMES$AVG_WEIGHT_diff = GAMES$AVG_WEIGHT_home - GAMES$AVG_WEIGHT_away
 ```
+### BEGIN LINEAR MODEL FOR SPREAD
