@@ -197,3 +197,59 @@ GAMES$AVG_HEIGHT_diff = GAMES$AVG_HEIGHT_home - GAMES$AVG_HEIGHT_away
 GAMES$AVG_WEIGHT_diff = GAMES$AVG_WEIGHT_home - GAMES$AVG_WEIGHT_away
 ```
 ### BEGIN LINEAR MODEL FOR SPREAD
+```{r}
+#Create dataset excluding some observations so that cross-validation is possible
+spread_holdout <- subset(GAMES, YEAR == 2003)
+GAMES_spread <- subset(GAMES, YEAR >= 2004)
+
+
+#Create a model with all variables
+spread_all <- lm(Spread ~  HOME_TEAM_ID + VISITOR_TEAM_ID + FG_PCT_home +FT_PCT_home+FG3_PCT_home+AST_home+REB_home+PTS_away+FG_PCT_away+FT_PCT_away+FG3_PCT_away+AST_away+REB_away+HOME_TEAM_WINS+OREB_home+OREB_away+OREB+DREB_home+DREB_away+DREB+OREBP_home+OREBP_away+DREBP_home+DREBP_away+EFGP_home+EFGP_away+TOVP_home+TOVP_away+FTR_home+FTR_away+HEIGHT_PROP_home+HEIGHT_PROP_away+AVG_HEIGHT_home+AVG_HEIGHT_away+AVG_WEIGHT_home+AVG_WEIGHT_away+OREB_diff+DREB_diff+OREBP_diff+DREBP_diff+EFGP_diff+TOVP_diff+FTR_diff+HEIGHT_PROP_diff+WEIGHT_PROP_diff+AVG_HEIGHT_diff+AVG_WEIGHT_diff, data = GAMES_spread)
+#Stepwise function to find the best variables
+MSE = (summary(spread_all)$sigma)^2
+step(spread_all, scale = MSE)
+```
+```{r}
+#Create model with narrowed variables
+spread_mod1 = lm(formula = Spread ~ FG_PCT_home + FT_PCT_home + FG3_PCT_home + 
+    AST_home + REB_home + PTS_away + FG_PCT_away + FT_PCT_away + 
+    FG3_PCT_away + AST_away + HOME_TEAM_WINS + OREB_away + DREB_home + 
+    DREB_away + OREBP_home + OREBP_away + EFGP_home + EFGP_away + 
+    TOVP_home + TOVP_away + FTR_home + FTR_away + HEIGHT_PROP_home + 
+    AVG_HEIGHT_home + AVG_HEIGHT_away + AVG_WEIGHT_away, data = GAMES_spread)
+summary(spread_mod1)
+
+```
+```{r}
+#Create correlation table to see which variables could have interactions within the model
+library(corrr)
+spread_cor <- correlate(GAMES_spread[sapply(GAMES_spread, is.numeric)])
+spread_cor %>% 
+  focus(FG_PCT_home, FT_PCT_home, FG3_PCT_home,
+    AST_home, REB_home, PTS_away, FG_PCT_away, FT_PCT_away,
+    FG3_PCT_away, AST_away, HOME_TEAM_WINS, OREB_away, DREB_home, 
+    DREB_away, OREBP_home, OREBP_away, EFGP_home, EFGP_away,
+    TOVP_home, TOVP_away, FTR_home, FTR_away, HEIGHT_PROP_home, 
+    AVG_HEIGHT_home, AVG_HEIGHT_away, AVG_WEIGHT_away, mirror=TRUE)
+```
+```{r}
+#Add interaction terms of high correlation variables
+spread_mod2 = lm(formula = Spread ~ FG_PCT_home + FT_PCT_home + FG3_PCT_home + 
+    AST_home + REB_home + PTS_away + FG_PCT_away + FT_PCT_away + 
+    FG3_PCT_away + AST_away + HOME_TEAM_WINS + OREB_away + DREB_home + 
+    DREB_away + OREBP_home + OREBP_away + EFGP_home + EFGP_away + 
+    TOVP_home + TOVP_away + FTR_home + FTR_away + HEIGHT_PROP_home + 
+    AVG_HEIGHT_home + AVG_HEIGHT_away + AVG_WEIGHT_away +(AST_away*PTS_away)+(EFGP_home*FG_PCT_home)+(REB_home*DREB_home)+(EFGP_away*FG_PCT_away), data = GAMES_spread)
+summary(spread_mod2)
+plot(spread_mod2)
+```
+```{r}
+#Cross-validation
+PredictSpread <- predict(spread_mod2, newdata=spread_holdout)
+holdoutresid = spread_holdout$Spread - PredictSpread
+hist(holdoutresid)
+crosscorr=cor(spread_holdout$Spread, PredictSpread)
+crosscorr^2
+.9621-crosscorr^2
+```
+
