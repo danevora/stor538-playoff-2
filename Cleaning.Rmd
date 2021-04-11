@@ -247,6 +247,10 @@ summary(spread_mod2)
 plot(spread_mod2)
 ```
 ```{r}
+anova(spread_mod1, spread_mod2)
+```
+
+```{r}
 #Cross-validation
 PredictSpread <- predict(spread_mod2, newdata=spread_holdout)
 holdoutresid = spread_holdout$Spread - PredictSpread
