@@ -8,8 +8,16 @@ GAMES = read.csv("Data/games.csv")
 GAMES_DETAILS = read.csv("Data/games_details.csv")
 TEAMS = read.csv("Data/teams.csv")
 PLAYERS = read.csv("Data/players.csv")
+PREDICTIONS = read.csv("Data/Predictions.csv")
 ```
 ### CLEANING THE DATA
+
+### TRAINING DATA
+```{r}
+TEAM_STATS = TEAMS[,c("TEAM_ID", "NICKNAME", "CITY")]
+TEAM_STATS$TEAM_NAME = paste(TEAM_STATS$CITY, TEAM_STATS$NICKNAME)
+TEAM_STATS = TEAM_STATS[,c("TEAM_ID", "TEAM_NAME")]
+```
 ```{r}
 #Clean the date variable in games
 GAMES = GAMES %>%
@@ -37,166 +45,230 @@ GAMES_DETAILS = left_join(GAMES_DETAILS, PLAYERS, by=c("PLAYER_NAME", "YEAR"))
 #Creating the Spread and Total variables
 GAMES = mutate(GAMES, Spread=PTS_home-PTS_away, Total=PTS_home+PTS_away)
 ```
+```{r}
+RECENT_GAMES = subset(GAMES, YEAR >= 2016)
+RECENT_GAMES_DETAILS = subset(GAMES_DETAILS, YEAR >= 2016)
+CURRENT_GAMES = subset(GAMES, YEAR >= 2020)
+CURRENT_GAMES_DETAILS = subset(GAMES_DETAILS, YEAR >= 2020)
+CURRENT_PLAYERS = subset(PLAYERS, YEAR >= 2020)
+```
+```{r}
+POINTS = RECENT_GAMES_DETAILS %>%
+        select(TEAM_ABBREVIATION, GAME_ID, TEAM_ID, PTS) %>%
+        group_by(TEAM_ABBREVIATION, GAME_ID, TEAM_ID) %>%
+        
+```
 ```{r message=FALSE}
 #Obtain OREB
-OREB = GAMES_DETAILS %>%
+OREB = RECENT_GAMES_DETAILS %>%
           select (TEAM_ABBREVIATION,GAME_ID,TEAM_ID,OREB) %>%
           transform(OREB = as.numeric(OREB)) %>%
           group_by(TEAM_ABBREVIATION,GAME_ID,TEAM_ID) %>%
           summarize(OREB=sum(OREB,na.rm=T)) %>%
+          group_by(TEAM_ID) %>%
+          summarize(OREB=mean(OREB,na.rm=T)) %>%
           ungroup()
+TEAM_STATS = left_join(TEAM_STATS, OREB, by=c("TEAM_ID"))
 ```
 ```{r message=FALSE}
 #Obtain DREB
-DREB = GAMES_DETAILS %>%
+DREB = RECENT_GAMES_DETAILS %>%
           select (TEAM_ABBREVIATION,GAME_ID,TEAM_ID,DREB) %>%
           transform(DREB = as.numeric(DREB)) %>%
           group_by(TEAM_ABBREVIATION,GAME_ID,TEAM_ID) %>%
           summarize(DREB=sum(DREB,na.rm=T)) %>%
+          group_by(TEAM_ID) %>%
+          summarize(DREB=mean(DREB,na.rm=T)) %>%
           ungroup()
+TEAM_STATS = left_join(TEAM_STATS, DREB, by=c("TEAM_ID"))
 ```
 ```{r message=FALSE}
 #Obtain EFG%
-EFGP = GAMES_DETAILS %>%
+EFGP = RECENT_GAMES_DETAILS %>%
           select(TEAM_ABBREVIATION,GAME_ID,TEAM_ID,FGM,FGA,FG3M,FG3A) %>%
           group_by(TEAM_ABBREVIATION,GAME_ID,TEAM_ID) %>%
           summarize(EFGP=(sum(FGM, na.rm=T)+0.5*sum(FG3M, na.rm=T))/sum(FGA, na.rm=T)) %>%
+          group_by(TEAM_ID) %>%
+          summarize(EFGP=mean(EFGP,na.rm=T)) %>%
           ungroup()
+TEAM_STATS = left_join(TEAM_STATS, EFGP, by=c("TEAM_ID"))
 ```
 ```{r message=FALSE}
 #Obtain TOV%
-TOVP = GAMES_DETAILS %>%
+TOVP = RECENT_GAMES_DETAILS %>%
           select(TEAM_ABBREVIATION,GAME_ID,TEAM_ID,TO,FGA,FTA) %>%
           group_by(TEAM_ABBREVIATION,GAME_ID,TEAM_ID) %>%
           summarize(TOVP=sum(TO, na.rm=T)/(sum(FGA, na.rm=T)+0.44*sum(FTA, na.rm=T)+sum(TO, na.rm=T))) %>%
+          group_by(TEAM_ID) %>%
+          summarize(TOVP=mean(TOVP,na.rm=T)) %>%
           ungroup()
+TEAM_STATS = left_join(TEAM_STATS, TOVP, by=c("TEAM_ID"))
 ```
 ```{r message=FALSE}
 #Obtain FTR
-FTR = GAMES_DETAILS %>%
+FTR = RECENT_GAMES_DETAILS %>%
           select(TEAM_ABBREVIATION,GAME_ID,TEAM_ID,FTA,FGA) %>%
           group_by(TEAM_ABBREVIATION,GAME_ID,TEAM_ID) %>%
           summarize(FTR=sum(FTA, na.rm=T)/sum(FGA, na.rm=T)) %>%
+          group_by(TEAM_ID) %>%
+          summarize(FTR=mean(FTR,na.rm=T)) %>%
           ungroup()
+TEAM_STATS = left_join(TEAM_STATS, FTR, by=c("TEAM_ID"))
 ```
 ```{r}
-#Calculate average height and weight of all players in the PLAYERS dataset
-avg_height = mean(PLAYERS$HEIGHT, na.rm=T)
-avg_weight = mean(PLAYERS$WEIGHT, na.rm=T)
+#Calculate average height and weight of current players in the PLAYERS dataset
+avg_height = mean(CURRENT_PLAYERS$HEIGHT,na.rm=T)
+avg_weight = mean(CURRENT_PLAYERS$WEIGHT,na.rm=T)
 ```
 ```{r}
 #Create identifier variables: ABOVE_AVG_HEIGHT & ABOVE_AVG_WEIGHT
-GAMES_DETAILS$ABOVE_AVG_HEIGHT = ifelse(GAMES_DETAILS$HEIGHT > avg_height, 1, 0)
-GAMES_DETAILS$ABOVE_AVG_WEIGHT = ifelse(GAMES_DETAILS$WEIGHT > avg_weight, 1, 0)
+CURRENT_GAMES_DETAILS$ABOVE_AVG_HEIGHT = ifelse(CURRENT_GAMES_DETAILS$HEIGHT > avg_height, 1, 0)
+CURRENT_GAMES_DETAILS$ABOVE_AVG_WEIGHT = ifelse(CURRENT_GAMES_DETAILS$WEIGHT > avg_weight, 1, 0)
 ```
 ```{r message=FALSE}
 #Obtain percentage above average height and percentage above average weight
-HEIGHT_PROP = GAMES_DETAILS %>%
+HEIGHT_PROP = CURRENT_GAMES_DETAILS %>%
           select(TEAM_ABBREVIATION,GAME_ID,TEAM_ID,ABOVE_AVG_HEIGHT) %>%
           group_by(TEAM_ABBREVIATION,GAME_ID,TEAM_ID) %>%
-          summarize(HEIGHT_PROP=sum(ABOVE_AVG_HEIGHT, na.rm=T)/n()) %>%
-          ungroup()
-WEIGHT_PROP = GAMES_DETAILS %>%
+          summarize(HEIGHT_PROP=sum(ABOVE_AVG_HEIGHT,na.rm=T)/n()) %>%
+          group_by(TEAM_ID) %>%
+          summarize(HEIGHT_PROP=mean(HEIGHT_PROP,na.rm=T))
+WEIGHT_PROP = CURRENT_GAMES_DETAILS %>%
           select(TEAM_ABBREVIATION,GAME_ID,TEAM_ID,ABOVE_AVG_WEIGHT) %>%
           group_by(TEAM_ABBREVIATION,GAME_ID,TEAM_ID) %>%
-          summarize(WEIGHT_PROP=sum(ABOVE_AVG_WEIGHT, na.rm=T)/n()) %>%
-          ungroup()
+          summarize(WEIGHT_PROP=sum(ABOVE_AVG_WEIGHT,na.rm=T)/n()) %>%
+          group_by(TEAM_ID) %>%
+          summarize(WEIGHT_PROP=mean(WEIGHT_PROP,na.rm=T))
+TEAM_STATS = left_join(TEAM_STATS, HEIGHT_PROP, by=c("TEAM_ID"))
+TEAM_STATS = left_join(TEAM_STATS, WEIGHT_PROP, by=c("TEAM_ID"))
 ```
 ```{r message=FALSE}
-# Obtain AVG_HEIGHT and AVG_WEIGHT
-AVG_HEIGHT = GAMES_DETAILS %>%
+# Obtain AVG_HEIGHT and AVG_WEIGHT for current players
+AVG_HEIGHT = CURRENT_GAMES_DETAILS %>%
           select(TEAM_ABBREVIATION,GAME_ID,TEAM_ID,HEIGHT) %>%
           group_by(TEAM_ABBREVIATION,GAME_ID,TEAM_ID) %>%
           summarize(AVG_HEIGHT = mean(HEIGHT, na.rm=T)) %>%
-          ungroup()
-AVG_WEIGHT = GAMES_DETAILS %>%
+          group_by(TEAM_ID) %>%
+          summarize(AVG_HEIGHT = mean(AVG_HEIGHT, na.rm=T))
+AVG_WEIGHT = CURRENT_GAMES_DETAILS %>%
           select(TEAM_ABBREVIATION,GAME_ID,TEAM_ID,WEIGHT) %>%
           group_by(TEAM_ABBREVIATION,GAME_ID,TEAM_ID) %>%
-          summarize(AVG_WEIGHT = mean(WEIGHT, na.rm=T)) %>%
+          summarize(AVG_WEIGHT=mean(WEIGHT,na.rm=T)) %>%
+          group_by(TEAM_ID) %>%
+          summarize(AVG_WEIGHT=mean(AVG_WEIGHT,na.rm=T))
+TEAM_STATS = left_join(TEAM_STATS, AVG_HEIGHT, by=c("TEAM_ID"))
+TEAM_STATS = left_join(TEAM_STATS, AVG_WEIGHT, by=c("TEAM_ID"))
+```
+
+## OLD DATA
+```{r}
+OLD_TEAM_STATS = TEAMS[,c("TEAM_ID", "NICKNAME", "CITY")]
+OLD_TEAM_STATS$TEAM_NAME = paste(OLD_TEAM_STATS$CITY, OLD_TEAM_STATS$NICKNAME)
+OLD_TEAM_STATS = OLD_TEAM_STATS[,c("TEAM_ID", "TEAM_NAME")]
+```
+```{r}
+OLD_GAMES = subset(GAMES, YEAR < 2016)
+OLD_GAMES_DETAILS = subset(GAMES_DETAILS, YEAR < 2016)
+OLD_PLAYERS = subset(PLAYERS, YEAR < 2016)
+```
+```{r message=FALSE}
+#Obtain OREB
+OLD_OREB = OLD_GAMES_DETAILS %>%
+          select (TEAM_ABBREVIATION,GAME_ID,TEAM_ID,OREB) %>%
+          transform(OREB = as.numeric(OREB)) %>%
+          group_by(TEAM_ABBREVIATION,GAME_ID,TEAM_ID) %>%
+          summarize(OREB=sum(OREB,na.rm=T)) %>%
+          group_by(TEAM_ID) %>%
+          summarize(OREB=mean(OREB,na.rm=T)) %>%
           ungroup()
+OLD_TEAM_STATS = left_join(OLD_TEAM_STATS, OLD_OREB, by=c("TEAM_ID"))
+```
+```{r message=FALSE}
+#Obtain DREB
+OLD_DREB = OLD_GAMES_DETAILS %>%
+          select (TEAM_ABBREVIATION,GAME_ID,TEAM_ID,DREB) %>%
+          transform(DREB = as.numeric(DREB)) %>%
+          group_by(TEAM_ABBREVIATION,GAME_ID,TEAM_ID) %>%
+          summarize(DREB=sum(DREB,na.rm=T)) %>%
+          group_by(TEAM_ID) %>%
+          summarize(DREB=mean(DREB,na.rm=T)) %>%
+          ungroup()
+OLD_TEAM_STATS = left_join(OLD_TEAM_STATS, OLD_DREB, by=c("TEAM_ID"))
+```
+```{r message=FALSE}
+#Obtain EFG%
+OLD_EFGP = OLD_GAMES_DETAILS %>%
+          select(TEAM_ABBREVIATION,GAME_ID,TEAM_ID,FGM,FGA,FG3M,FG3A) %>%
+          group_by(TEAM_ABBREVIATION,GAME_ID,TEAM_ID) %>%
+          summarize(EFGP=(sum(FGM, na.rm=T)+0.5*sum(FG3M, na.rm=T))/sum(FGA, na.rm=T)) %>%
+          group_by(TEAM_ID) %>%
+          summarize(EFGP=mean(EFGP,na.rm=T)) %>%
+          ungroup()
+OLD_TEAM_STATS = left_join(OLD_TEAM_STATS, OLD_EFGP, by=c("TEAM_ID"))
+```
+```{r message=FALSE}
+#Obtain TOV%
+OLD_TOVP = OLD_GAMES_DETAILS %>%
+          select(TEAM_ABBREVIATION,GAME_ID,TEAM_ID,TO,FGA,FTA) %>%
+          group_by(TEAM_ABBREVIATION,GAME_ID,TEAM_ID) %>%
+          summarize(TOVP=sum(TO, na.rm=T)/(sum(FGA, na.rm=T)+0.44*sum(FTA, na.rm=T)+sum(TO, na.rm=T))) %>%
+          group_by(TEAM_ID) %>%
+          summarize(TOVP=mean(TOVP,na.rm=T)) %>%
+          ungroup()
+OLD_TEAM_STATS = left_join(OLD_TEAM_STATS, OLD_TOVP, by=c("TEAM_ID"))
+```
+```{r message=FALSE}
+#Obtain FTR
+OLD_FTR = OLD_GAMES_DETAILS %>%
+          select(TEAM_ABBREVIATION,GAME_ID,TEAM_ID,FTA,FGA) %>%
+          group_by(TEAM_ABBREVIATION,GAME_ID,TEAM_ID) %>%
+          summarize(FTR=sum(FTA, na.rm=T)/sum(FGA, na.rm=T)) %>%
+          group_by(TEAM_ID) %>%
+          summarize(FTR=mean(FTR,na.rm=T)) %>%
+          ungroup()
+OLD_TEAM_STATS = left_join(OLD_TEAM_STATS, OLD_FTR, by=c("TEAM_ID"))
 ```
 ```{r}
-#Add OREB to GAMES
-GAMES = left_join(GAMES, select(OREB, -TEAM_ABBREVIATION), by = c("GAME_ID", "HOME_TEAM_ID"="TEAM_ID")) %>%
-          rename(OREB_home = OREB) %>%
-          left_join(select(OREB, -TEAM_ABBREVIATION), by = c("GAME_ID", "VISITOR_TEAM_ID"="TEAM_ID")) %>%
-          rename(OREB_away = OREB) %>%
-          mutate(OREB = OREB_home + OREB_away)
+#Calculate average height and weight of current players in the PLAYERS dataset
+OLD_avg_height = mean(OLD_PLAYERS$HEIGHT,na.rm=T)
+OLD_avg_weight = mean(OLD_PLAYERS$WEIGHT,na.rm=T)
 ```
 ```{r}
-#Add DREB to GAMES
-GAMES = left_join(GAMES, select(DREB, -TEAM_ABBREVIATION), by = c("GAME_ID", "HOME_TEAM_ID"="TEAM_ID")) %>%
-          rename(DREB_home = DREB) %>%
-          left_join(select(DREB, -TEAM_ABBREVIATION), by = c("GAME_ID", "VISITOR_TEAM_ID"="TEAM_ID")) %>%
-          rename(DREB_away = DREB) %>%
-          mutate(DREB = DREB_home + DREB_away)
+#Create identifier variables: ABOVE_AVG_HEIGHT & ABOVE_AVG_WEIGHT
+OLD_GAMES_DETAILS$ABOVE_AVG_HEIGHT = ifelse(OLD_GAMES_DETAILS$HEIGHT > OLD_avg_height, 1, 0)
+OLD_GAMES_DETAILS$ABOVE_AVG_WEIGHT = ifelse(OLD_GAMES_DETAILS$WEIGHT > OLD_avg_weight, 1, 0)
 ```
-```{r}
-#Create OREB% and DREB% variables
-GAMES = GAMES %>%
-          mutate(OREBP_home=OREB_home/(OREB_home+DREB_away)) %>%
-          mutate(OREBP_away=OREB_away/(OREB_away+DREB_home)) %>%
-          mutate(DREBP_home=DREB_home/(DREB_home+OREB_away)) %>%
-          mutate(DREBP_away=DREB_away/(DREB_away+OREB_home))
+```{r message=FALSE}
+#Obtain percentage above average height and percentage above average weight
+OLD_HEIGHT_PROP = OLD_GAMES_DETAILS %>%
+          select(TEAM_ABBREVIATION,GAME_ID,TEAM_ID,ABOVE_AVG_HEIGHT) %>%
+          group_by(TEAM_ABBREVIATION,GAME_ID,TEAM_ID) %>%
+          summarize(HEIGHT_PROP=sum(ABOVE_AVG_HEIGHT,na.rm=T)/n()) %>%
+          group_by(TEAM_ID) %>%
+          summarize(HEIGHT_PROP=mean(HEIGHT_PROP,na.rm=T))
+OLD_WEIGHT_PROP = OLD_GAMES_DETAILS %>%
+          select(TEAM_ABBREVIATION,GAME_ID,TEAM_ID,ABOVE_AVG_WEIGHT) %>%
+          group_by(TEAM_ABBREVIATION,GAME_ID,TEAM_ID) %>%
+          summarize(WEIGHT_PROP=sum(ABOVE_AVG_WEIGHT,na.rm=T)/n()) %>%
+          group_by(TEAM_ID) %>%
+          summarize(WEIGHT_PROP=mean(WEIGHT_PROP,na.rm=T))
+OLD_TEAM_STATS = left_join(OLD_TEAM_STATS, OLD_HEIGHT_PROP, by=c("TEAM_ID"))
+OLD_TEAM_STATS = left_join(OLD_TEAM_STATS, OLD_WEIGHT_PROP, by=c("TEAM_ID"))
 ```
-```{r}
-#Add EFG% to GAMES
-GAMES = left_join(GAMES, select(EFGP, -TEAM_ABBREVIATION), by = c("GAME_ID", "HOME_TEAM_ID"="TEAM_ID")) %>%
-          rename(EFGP_home = EFGP) %>%
-          left_join(select(EFGP, -TEAM_ABBREVIATION), by = c("GAME_ID", "VISITOR_TEAM_ID"="TEAM_ID")) %>%
-          rename(EFGP_away = EFGP)
+```{r message=FALSE}
+# Obtain AVG_HEIGHT and AVG_WEIGHT for current players
+OLD_AVG_HEIGHT = OLD_GAMES_DETAILS %>%
+          select(TEAM_ABBREVIATION,GAME_ID,TEAM_ID,HEIGHT) %>%
+          group_by(TEAM_ABBREVIATION,GAME_ID,TEAM_ID) %>%
+          summarize(AVG_HEIGHT = mean(HEIGHT, na.rm=T)) %>%
+          group_by(TEAM_ID) %>%
+          summarize(AVG_HEIGHT = mean(AVG_HEIGHT, na.rm=T))
+OLD_AVG_WEIGHT = OLD_GAMES_DETAILS %>%
+          select(TEAM_ABBREVIATION,GAME_ID,TEAM_ID,WEIGHT) %>%
+          group_by(TEAM_ABBREVIATION,GAME_ID,TEAM_ID) %>%
+          summarize(AVG_WEIGHT=mean(WEIGHT,na.rm=T)) %>%
+          group_by(TEAM_ID) %>%
+          summarize(AVG_WEIGHT=mean(AVG_WEIGHT,na.rm=T))
+OLD_TEAM_STATS = left_join(OLD_TEAM_STATS, OLD_AVG_HEIGHT, by=c("TEAM_ID"))
+OLD_TEAM_STATS = left_join(OLD_TEAM_STATS, OLD_AVG_WEIGHT, by=c("TEAM_ID"))
 ```
-```{r}
-#Add TOV% to GAMES
-GAMES = left_join(GAMES, select(TOVP, -TEAM_ABBREVIATION), by = c("GAME_ID", "HOME_TEAM_ID"="TEAM_ID")) %>%
-          rename(TOVP_home = TOVP) %>%
-          left_join(select(TOVP, -TEAM_ABBREVIATION), by = c("GAME_ID", "VISITOR_TEAM_ID"="TEAM_ID")) %>%
-          rename(TOVP_away = TOVP)
-```
-```{r}
-#Add FTR to GAMES
-GAMES = left_join(GAMES, select(FTR, -TEAM_ABBREVIATION), by = c("GAME_ID", "HOME_TEAM_ID"="TEAM_ID")) %>%
-          rename(FTR_home = FTR) %>%
-          left_join(select(FTR, -TEAM_ABBREVIATION), by = c("GAME_ID", "VISITOR_TEAM_ID"="TEAM_ID")) %>%
-          rename(FTR_away = FTR)
-```
-```{r}
-# Add HEIGHT_PROP and WEIGHT_PROP
-GAMES = left_join(GAMES, select(HEIGHT_PROP, -TEAM_ABBREVIATION), by = c("GAME_ID", "HOME_TEAM_ID"="TEAM_ID")) %>%
-          rename(HEIGHT_PROP_home = HEIGHT_PROP) %>%
-          left_join(select(HEIGHT_PROP, -TEAM_ABBREVIATION), by = c("GAME_ID", "VISITOR_TEAM_ID"="TEAM_ID")) %>%
-          rename(HEIGHT_PROP_away = HEIGHT_PROP)
-GAMES = left_join(GAMES, select(WEIGHT_PROP, -TEAM_ABBREVIATION), by = c("GAME_ID", "HOME_TEAM_ID"="TEAM_ID")) %>%
-          rename(WEIGHT_PROP_home = WEIGHT_PROP) %>%
-          left_join(select(WEIGHT_PROP, -TEAM_ABBREVIATION), by = c("GAME_ID", "VISITOR_TEAM_ID"="TEAM_ID")) %>%
-          rename(WEIGHT_PROP_away = WEIGHT_PROP)
-```
-```{r}
-#Add AVG_HEIGHT and AVG_WEIGHT
-GAMES = left_join(GAMES, select(AVG_HEIGHT, -TEAM_ABBREVIATION), by = c("GAME_ID", "HOME_TEAM_ID"="TEAM_ID")) %>%
-          rename(AVG_HEIGHT_home = AVG_HEIGHT) %>%
-          left_join(select(AVG_HEIGHT, -TEAM_ABBREVIATION), by = c("GAME_ID", "VISITOR_TEAM_ID"="TEAM_ID")) %>%
-          rename(AVG_HEIGHT_away = AVG_HEIGHT)
-GAMES = left_join(GAMES, select(AVG_WEIGHT, -TEAM_ABBREVIATION), by = c("GAME_ID", "HOME_TEAM_ID"="TEAM_ID")) %>%
-          rename(AVG_WEIGHT_home = AVG_WEIGHT) %>%
-          left_join(select(AVG_WEIGHT, -TEAM_ABBREVIATION), by = c("GAME_ID", "VISITOR_TEAM_ID"="TEAM_ID")) %>%
-          rename(AVG_WEIGHT_away = AVG_WEIGHT)
-```
-```{r}
-#Create difference variables
-GAMES$OREB_diff = GAMES$OREB_home - GAMES$OREB_away
-GAMES$DREB_diff = GAMES$DREB_home - GAMES$DREB_away
-GAMES$OREBP_diff = GAMES$OREBP_home - GAMES$OREBP_away
-GAMES$DREBP_diff = GAMES$DREBP_home - GAMES$DREBP_away
-GAMES$EFGP_diff = GAMES$EFGP_home - GAMES$EFGP_away
-GAMES$TOVP_diff = GAMES$TOVP_home - GAMES$TOVP_away
-GAMES$FTR_diff = GAMES$FTR_home - GAMES$FTR_away
-GAMES$HEIGHT_PROP_diff = GAMES$HEIGHT_PROP_home - GAMES$HEIGHT_PROP_away
-GAMES$WEIGHT_PROP_diff = GAMES$WEIGHT_PROP_home - GAMES$WEIGHT_PROP_away
-GAMES$AVG_HEIGHT_diff = GAMES$AVG_HEIGHT_home - GAMES$AVG_HEIGHT_away
-GAMES$AVG_WEIGHT_diff = GAMES$AVG_WEIGHT_home - GAMES$AVG_WEIGHT_away
-```
-```{r}
-GAMES = GAMES[complete.cases(GAMES),]
-```
-### BEGIN LINEAR MODEL FOR SPREAD
