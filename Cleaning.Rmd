@@ -20,6 +20,16 @@ GAMES = GAMES %>%
 GAMES_DETAILS = left_join(GAMES_DETAILS, select(GAMES, c("GAME_ID", "YEAR", "MONTH", "DAY")), by="GAME_ID")
 ```
 ```{r}
+# Add team names to games dataset
+JUST_NAMES = TEAMS[,c("TEAM_ID", "NICKNAME", "CITY")]
+JUST_NAMES$TEAM_NAME = paste(JUST_NAMES$CITY, JUST_NAMES$NICKNAME)
+JUST_NAMES = JUST_NAMES[,c("TEAM_ID", "TEAM_NAME")]
+GAMES = left_join(GAMES, JUST_NAMES, by=c("HOME_TEAM_ID"="TEAM_ID")) %>%
+          rename(Team.Home = TEAM_NAME) %>%
+          left_join(JUST_NAMES, by=c("VISITOR_TEAM_ID"="TEAM_ID")) %>%
+          rename(Team.Away = TEAM_NAME)
+```
+```{r}
 #Clean the player data
 PLAYERS = PLAYERS[,c(1,4,5,21)]
 names(PLAYERS) = c("PLAYER_NAME","HEIGHT","WEIGHT","YEAR")
