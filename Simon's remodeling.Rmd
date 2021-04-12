@@ -1,0 +1,66 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+
+```{r}
+library(MASS)
+
+library(boot)
+```
+
+
+```{r}
+#games.forstepAIC = na.omit(GAMES)
+prediction_variables = c("OREB", "EFGP_home", "TOVP_home", "FTR_home", "Spread", "EFGP_away", "TOVP_away", "FTR_away", "PTS_home", "FG_PCT_home", "FT_PCT_home", "FG3_PCT_home", "AST_home", "REB_home", "PTS_away", "FG_PCT_away", "FT_PCT_away", "FG3_PCT_away", "AST_away", "REB_away", "HOME_TEAM_WINS", "Total", "DREB_home", "DREB_away", "DREB", "HEIGHT_PROP_home", "HEIGHT_PROP_away", "WEIGHT_PROP_home", "WEIGHT_PROP_away", "AVG_HEIGHT_home", "AVG_HEIGHT_away", "AVG_WEIGHT_home", "AVG_WEIGHT_away", "OREB_diff")
+glmgames = GAMES[,prediction_variables]
+#glmgames_2 = na.omit(glmgames)
+none = glm(OREB~1, data=glmgames, family=poisson)
+full = glm(OREB~., data=glmgames, family=poisson)
+final_model_both = stepAIC(none, scope=list(upper=full), trace=FALSE)
+summary(final_model_both)
+```
+
+
+```{r}
+cv.glm(glmgames,final_model_both, K=10)
+```
+
+
+
+
+```{r}
+Oreb_lm = lm(log(OREB)~., data=glmgames)
+MSEall = (summary(Oreb_lm)$sigma)^2
+noneall = lm(log(OREB)~1, data=glmgames)
+complete = step(noneall, scope=list(upper=Oreb_lm), scale=MSEall, direction="forward", trace=FALSE)
+summary(complete)
+```
+
+```{r}
+jaja = lm(log(OREB)~ log(OREB) + log(EFGP_home) + log(TOVP_home) + log(FTR_home)+log(Spread) +log(EFGP_away)+ log(TOVP_away) +log(FTR_away) +log(PTS_home) +log(FG_PCT_home) +log(FT_PCT_home) +log(FG3_PCT_home)+ log(AST_home) +log(REB_home)+ log(PTS_away) +log(FG_PCT_away) log(FT_PCT_away) log(FG3_PCT_away) log(AST_away) log(REB_away) log(HOME_TEAM_WINS) log(Total) log(DREB_home) log(DREB_away) log(DREB) log(HEIGHT_PROP_home) log(HEIGHT_PROP_away) log(WEIGHT_PROP_home) log(WEIGHT_PROP_away) log(AVG_HEIGHT_home) log(AVG_HEIGHT_away) log(AVG_WEIGHT_home) log(AVG_WEIGHT_away) log(OREB_diff), data=glmgames)
+plot(jaja)
+```
+
+
+
+```{r}
+predict.glm(final_model_both)
+```
+
+```{r}
+predict.lm(complete)
+```
+
+```{r}
+##model building
+model <- glm(formula = groupcol ~ var1 + var2 + var3,
+        family = "binomial", data = training)
+
+##cross-validation
+cv.glm(testing, model, K=10)
+```
+
