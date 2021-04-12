@@ -207,6 +207,8 @@ GAMES$AVG_HEIGHT_diff = GAMES$AVG_HEIGHT_home - GAMES$AVG_HEIGHT_away
 GAMES$AVG_WEIGHT_diff = GAMES$AVG_WEIGHT_home - GAMES$AVG_WEIGHT_away
 ```
 ```{r}
-GAMES = GAMES[complete.cases(GAMES),]
+GAMES = GAMES[complete.cases(GAMES),] %>%
+          subset(YEAR >= 2016)
 ```
+
 ### BEGIN LINEAR MODEL FOR SPREAD
