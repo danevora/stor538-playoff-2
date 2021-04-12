@@ -199,4 +199,179 @@ GAMES$AVG_WEIGHT_diff = GAMES$AVG_WEIGHT_home - GAMES$AVG_WEIGHT_away
 ```{r}
 GAMES = GAMES[complete.cases(GAMES),]
 ```
-### BEGIN LINEAR MODEL FOR SPREAD
+
+##Lasso Regression 
+
+```{r eval=TRUE}
+library(tidyverse)
+gamesmod<-GAMES%>%
+  select(FG_PCT_home, FT_PCT_home, FG3_PCT_home, AST_home, REB_home, FG_PCT_away, FT_PCT_away, FG3_PCT_away, AST_away, REB_away,Total, OREB_home, OREB_away, OREB, DREB, DREB_home, DREB_away, EFGP_home,EFGP_away,TOVP_home, TOVP_away, FTR_home, FTR_away, HEIGHT_PROP_home, HEIGHT_PROP_home, HEIGHT_PROP_away, WEIGHT_PROP_home, WEIGHT_PROP_away, AVG_HEIGHT_home, AVG_HEIGHT_away,  AVG_WEIGHT_home, AVG_WEIGHT_away, OREB_diff, DREB_diff, OREBP_diff, DREBP_diff, EFGP_diff, TOVP_diff, FTR_diff, HEIGHT_PROP_diff, WEIGHT_PROP_diff, AVG_HEIGHT_diff, AVG_WEIGHT_diff)
+
+library(glmnet)
+library(caret)
+library(mlr)
+
+gamesmatrix<-data.matrix(gamesmod, rownames.force = NA)
+#view(gamesmatrix)
+gamesmod1<-as.data.frame(GAMES)
+gamesmodspread<-gamesmod1$Spread
+
+fit<-glmnet(gamesmatrix,gamesmodspread)
+
+plot(fit)
+```
+
+###Crossfit Validation 
+
+```{r eval=TRUE}
+cvfit <- cv.glmnet(gamesmatrix,gamesmodspread, type.measure = "class")
+plot(cvfit)
+
+```
+
+
+
+```{r eval=TRUE}
+best<-cvfit$lambda.min
+predict(fit, s= best, type= "coefficients")
+
+```
+```{r eval=TRUE}
+pred.mod<-predict(fit,newx= gamesmatrix, s= best)
+spread.orig<-GAMES$Spread
+
+comp<-data.frame(pred.mod, spread.orig)
+
+comp
+```
+```{r eval=TRUE}
+summary(fit)
+```
+
+
+
+
+
+
+```{r eval=TRUE}
+library(ggplot2)
+
+ggplot(comp,aes(x=X1, y=spread.orig)) +
+  geom_point()
+
+cor(pred.mod, spread.orig)
+```
+
+
+
+```{r}
+gamestotal.mod<-GAMES %>%
+  mutate(logtotal = log(Total))
+
+view(gamestotal.mod)
+```
+
+
+```{r eval=TRUE}
+library(tidyverse)
+gamesmod2<-gamestotal.mod%>%
+  select(PTS_home,FG_PCT_home, FT_PCT_home, FG3_PCT_home, AST_home, REB_home, FG_PCT_away, FT_PCT_away, FG3_PCT_away, AST_away, REB_away,OREB_home, OREB_away, OREB, DREB, DREB_home, DREB_away, EFGP_home,EFGP_away,TOVP_home, TOVP_away, FTR_home, FTR_away, HEIGHT_PROP_home, HEIGHT_PROP_home, HEIGHT_PROP_away, WEIGHT_PROP_home, WEIGHT_PROP_away, AVG_HEIGHT_home, AVG_HEIGHT_away,  AVG_WEIGHT_home, AVG_WEIGHT_away, OREB_diff, DREB_diff, OREBP_diff, DREBP_diff, EFGP_diff, TOVP_diff, FTR_diff, HEIGHT_PROP_diff, WEIGHT_PROP_diff, AVG_HEIGHT_diff, AVG_WEIGHT_diff)
+
+library(glmnet)
+library(caret)
+library(mlr)
+
+gamesmatrix1<-data.matrix(gamesmod2, rownames.force = NA)
+#view(gamesmatrix)
+gamesmod3<-as.data.frame(gamestotal.mod)
+gamesmodtotal<-gamesmod3$logtotal
+
+fit1<-glmnet(gamesmatrix1,gamesmodtotal)
+
+plot(fit1)
+```
+###Crossfit Validation 
+
+```{r eval=TRUE}
+cvfit1 <- cv.glmnet(gamesmatrix1,gamesmodtotal, type.measure = "class")
+plot(cvfit1)
+
+```
+
+```{r eval=TRUE}
+best1<-cvfit1$lambda.min
+predict(fit1, s= best1, type= "coefficients")
+
+```
+
+```{r eval=TRUE}
+pred.mod1<-predict(fit1,newx= gamesmatrix1, s= best1)
+pred.mod1exp<-exp(pred.mod1)
+total.orig<-GAMES$Total
+
+comp1<-data.frame(pred.mod1exp, total.orig)
+
+comp1
+
+cor(pred.mod1exp,total.orig)
+```
+
+```{r eval=TRUE}
+library(ggplot2)
+
+ggplot(comp1,aes(x=X1, y=total.orig)) +
+  geom_point()
+
+```
+
+
+```{r}
+gamesoreb.mod<-GAMES %>%
+  mutate(logoreb = log(OREB))
+```
+
+
+```{r eval=TRUE}
+library(tidyverse)
+gamesmod3<-gamesoreb.mod%>%
+  select(PTS_home, PTS_away, Total, Spread, FG_PCT_home, FT_PCT_home, FG3_PCT_home, AST_home, REB_home, FG_PCT_away, FT_PCT_away, FG3_PCT_away, AST_away, REB_away,OREB_home, DREB, DREB_home, DREB_away, EFGP_home,EFGP_away,TOVP_home, TOVP_away, FTR_home, FTR_away, HEIGHT_PROP_home, HEIGHT_PROP_home, HEIGHT_PROP_away, WEIGHT_PROP_home, WEIGHT_PROP_away, AVG_HEIGHT_home, AVG_HEIGHT_away,  AVG_WEIGHT_home, AVG_WEIGHT_away, OREB_diff, DREB_diff, OREBP_diff, DREBP_diff, EFGP_diff, TOVP_diff, FTR_diff, HEIGHT_PROP_diff, WEIGHT_PROP_diff, AVG_HEIGHT_diff, AVG_WEIGHT_diff)
+
+library(glmnet)
+library(caret)
+library(mlr)
+
+gamesmatrix2<-data.matrix(gamesmod3, rownames.force = NA)
+#view(gamesmatrix)
+gamesmod4<-as.data.frame(gamesoreb.mod)
+gamesmodoreb<-gamesmod4$logoreb
+
+fit2<-glmnet(gamesmatrix2,gamesmodoreb)
+
+plot(fit2)
+```
+
+###Crossfit Validation 
+
+```{r eval=TRUE}
+cvfit2 <- cv.glmnet(gamesmatrix2,gamesmodoreb, type.measure = "class")
+plot(cvfit2)
+
+```
+
+```{r eval=TRUE}
+best2<-cvfit2$lambda.min
+predict(fit2, s= best2, type= "coefficients")
+
+```
+
+```{r eval=TRUE}
+pred.mod2<-predict(fit2,newx= gamesmatrix2, s= best2)
+pred.mod2exp<-exp(pred.mod2)
+oreb.orig<-GAMES$OREB
+
+comp2<-data.frame(pred.mod2exp, oreb.orig)
+
+comp2
+
+cor(pred.mod2exp,oreb.orig)
+```
